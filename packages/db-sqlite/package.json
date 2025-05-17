@@ -1,5 +1,5 @@
 {
-  "name": "@payloadcms/db-sqlite",
+  "name": "@drivly/db-sqlite-web",
   "version": "3.38.0",
   "description": "The officially supported SQLite database adapter for Payload",
   "homepage": "https://payloadcms.com",
