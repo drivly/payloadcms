@@ -1,1 +1,1 @@
-export * from 'drizzle-orm/libsql'
+export * from 'drizzle-orm/libsql/web'
