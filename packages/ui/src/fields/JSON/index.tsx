@@ -2,10 +2,8 @@
 import type { JSONFieldClientComponent } from 'payload'
 
 import { type OnMount } from '@monaco-editor/react'
-import JSON5 from 'json5' // Add JSON5 import
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import yaml from 'yaml' // Use yaml library for YAML support
 
 import { CodeEditor } from '../../elements/CodeEditor/index.js'
 import { RenderCustomComponent } from '../../elements/RenderCustomComponent/index.js'
@@ -16,6 +14,7 @@ import { FieldError } from '../FieldError/index.js'
 import { FieldLabel } from '../FieldLabel/index.js'
 import { mergeFieldStyles } from '../mergeFieldStyles.js'
 import { fieldBaseClass } from '../shared/index.js'
+import { parseData, stringifyData } from './client.js'
 import './index.scss'
 
 const baseClass = 'json-field'
@@ -61,18 +60,7 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
     validate: memoizedValidate,
   })
 
-  const [initialStringValue, setInitialStringValue] = useState<string | undefined>(() => {
-    if ((value || initialValue) !== undefined) {
-      const data = value ?? initialValue
-      if (format === 'yaml') {
-        return yaml.stringify(data)
-      } else if (format === 'json5') {
-        return JSON5.stringify(data, null, 2)
-      }
-      return JSON.stringify(data, null, 2)
-    }
-    return undefined
-  })
+  const [initialStringValue, setInitialStringValue] = useState<string | undefined>()
 
   const handleMount = useCallback<OnMount>(
     (editor, monaco) => {
@@ -107,21 +95,14 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
   )
 
   const handleChange = useCallback(
-    (val) => {
+    async (val) => {
       if (readOnly || disabled) {
         return
       }
       inputChangeFromRef.current = 'user'
 
       try {
-        let parsedValue
-        if (format === 'yaml') {
-          parsedValue = val ? yaml.parse(val) : null
-        } else if (format === 'json5') {
-          parsedValue = val ? JSON5.parse(val) : null
-        } else {
-          parsedValue = val ? JSON.parse(val) : null
-        }
+        const parsedValue = val ? await parseData(val, format) : null
         setValue(parsedValue)
         setJsonError(undefined)
       } catch (e) {
@@ -133,22 +114,20 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
   )
 
   useEffect(() => {
-    if (inputChangeFromRef.current === 'system') {
-      if ((value || initialValue) !== undefined) {
-        const data = value ?? initialValue
-        if (format === 'yaml') {
-          setInitialStringValue(yaml.stringify(data))
-        } else if (format === 'json5') {
-          setInitialStringValue(JSON5.stringify(data, null, 2))
+    const updateStringValue = async () => {
+      if (inputChangeFromRef.current === 'system') {
+        if ((value || initialValue) !== undefined) {
+          const data = value ?? initialValue
+          const stringified = await stringifyData(data, format)
+          setInitialStringValue(stringified)
         } else {
-          setInitialStringValue(JSON.stringify(data, null, 2))
+          setInitialStringValue(undefined)
         }
-      } else {
-        setInitialStringValue(undefined)
+        setEditorKey(new Date().toString())
       }
-      setEditorKey(new Date().toString())
     }
 
+    void updateStringValue()
     inputChangeFromRef.current = 'system'
   }, [initialValue, value, format])
 
