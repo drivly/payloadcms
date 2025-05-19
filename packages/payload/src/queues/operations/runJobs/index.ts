@@ -36,6 +36,11 @@ export type RunJobsArgs = {
   queue?: string
   req: PayloadRequest
   /**
+   * Return the processed job documents. Defaults to `false` to maintain
+   * backward compatibility.
+   */
+  returnJobs?: boolean
+  /**
    * By default, jobs are run in parallel.
    * If you want to run them in sequence, set this to true.
    */
@@ -44,6 +49,10 @@ export type RunJobsArgs = {
 }
 
 export type RunJobsResult = {
+  /**
+   * The jobs that were processed. Only returned when `returnJobs` is `true`.
+   */
+  jobs?: BaseJob[]
   jobStatus?: Record<string, RunJobResult>
   /**
    * If this is false, there for sure are no jobs remaining, regardless of the limit
@@ -63,6 +72,7 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
     processingOrder,
     queue,
     req,
+    returnJobs,
     sequential,
     where: whereFromProps,
   } = args
@@ -124,6 +134,8 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
   const jobsQuery: {
     docs: BaseJob[]
   } = { docs: [] }
+
+  const processedJobs: BaseJob[] = []
 
   if (id) {
     // Only one job to run
@@ -190,10 +202,16 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
   )
 
   if (!jobsQuery.docs.length) {
-    return {
+    const result: RunJobsResult = {
       noJobsRemaining: true,
       remainingJobsFromQueried: 0,
     }
+
+    if (returnJobs) {
+      result.jobs = []
+    }
+
+    return result
   }
 
   if (jobsQuery?.docs?.length) {
@@ -273,6 +291,8 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
         jobsToDelete.push(job.id)
       }
 
+      processedJobs.push(job)
+
       return { id: job.id, result }
     } else {
       const result = await runJSONJob({
@@ -286,6 +306,8 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
       if (result.status !== 'error' && jobsToDelete) {
         jobsToDelete.push(job.id)
       }
+
+      processedJobs.push(job)
 
       return { id: job.id, result }
     }
@@ -343,8 +365,14 @@ export const runJobs = async (args: RunJobsArgs): Promise<RunJobsResult> => {
     }
   }
 
-  return {
+  const returnValue: RunJobsResult = {
     jobStatus: resultsObject,
     remainingJobsFromQueried,
   }
+
+  if (returnJobs) {
+    returnValue.jobs = processedJobs
+  }
+
+  return returnValue
 }
