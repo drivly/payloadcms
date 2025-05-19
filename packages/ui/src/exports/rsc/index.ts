@@ -1,4 +1,5 @@
 export { FieldDiffLabel } from '../../elements/FieldDiffLabel/index.js'
+export { parseData, stringifyData } from '../../fields/JSON/server.js'
 export { File } from '../../graphics/File/index.js'
 export { CheckIcon } from '../../icons/Check/index.js'
 export { copyDataFromLocaleHandler } from '../../utilities/copyDataFromLocale.js'

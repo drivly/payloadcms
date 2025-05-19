@@ -1066,6 +1066,7 @@ export type JSONField = {
       Label?: CustomComponent<JSONFieldLabelClientComponent | JSONFieldLabelServerComponent>
     } & Admin['components']
     editorOptions?: EditorProps['options']
+    format?: 'json' | 'json5' | 'yaml' // Add format option with three choices
     maxHeight?: number
   } & Admin
 
@@ -1079,7 +1080,7 @@ export type JSONField = {
 } & Omit<FieldBase, 'admin' | 'validate'>
 
 export type JSONFieldClient = {
-  admin?: AdminClient & Pick<JSONField['admin'], 'editorOptions' | 'maxHeight'>
+  admin?: AdminClient & Pick<JSONField['admin'], 'editorOptions' | 'format' | 'maxHeight'>
 } & Omit<FieldBaseClient, 'admin'> &
   Pick<JSONField, 'jsonSchema' | 'type'>
 

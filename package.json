@@ -117,6 +117,10 @@
     "templates/**/pnpm-lock.yaml": "pnpm runts scripts/remove-template-lock-files.ts",
     "tsconfig.json": "node scripts/reset-tsconfig.js"
   },
+  "dependencies": {
+    "json5": "2.2.3",
+    "yaml": "2.8.0"
+  },
   "devDependencies": {
     "@jest/globals": "29.7.0",
     "@libsql/client": "0.14.0",
