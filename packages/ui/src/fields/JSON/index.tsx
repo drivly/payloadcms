@@ -2,8 +2,10 @@
 import type { JSONFieldClientComponent } from 'payload'
 
 import { type OnMount } from '@monaco-editor/react'
+import JSON5 from 'json5' // Add JSON5 import
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import yaml from 'yaml' // Use yaml library for YAML support
 
 import { CodeEditor } from '../../elements/CodeEditor/index.js'
 import { RenderCustomComponent } from '../../elements/RenderCustomComponent/index.js'
@@ -22,7 +24,7 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
   const {
     field,
     field: {
-      admin: { className, description, editorOptions, maxHeight } = {},
+      admin: { className, description, editorOptions, format = 'json', maxHeight } = {},
       jsonSchema,
       label,
       localized,
@@ -59,37 +61,49 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
     validate: memoizedValidate,
   })
 
-  const [initialStringValue, setInitialStringValue] = useState<string | undefined>(() =>
-    (value || initialValue) !== undefined
-      ? JSON.stringify(value ?? initialValue, null, 2)
-      : undefined,
-  )
+  const [initialStringValue, setInitialStringValue] = useState<string | undefined>(() => {
+    if ((value || initialValue) !== undefined) {
+      const data = value ?? initialValue
+      if (format === 'yaml') {
+        return yaml.stringify(data)
+      } else if (format === 'json5') {
+        return JSON5.stringify(data, null, 2)
+      }
+      return JSON.stringify(data, null, 2)
+    }
+    return undefined
+  })
 
   const handleMount = useCallback<OnMount>(
     (editor, monaco) => {
-      if (!jsonSchema) {
-        return
+      if (jsonSchema && format === 'json') {
+        monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+          enableSchemaRequest: true,
+          schemas: [
+            ...(monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas || []),
+            jsonSchema,
+          ],
+          validate: true,
+        })
+
+        const uri = jsonSchema.uri
+        const newUri = uri.includes('?')
+          ? `${uri}&${crypto.randomUUID ? crypto.randomUUID() : uuidv4()}`
+          : `${uri}?${crypto.randomUUID ? crypto.randomUUID() : uuidv4()}`
+
+        editor.setModel(
+          monaco.editor.createModel(
+            JSON.stringify(value, null, 2),
+            'json',
+            monaco.Uri.parse(newUri),
+          ),
+        )
+      } else {
+        const language = format === 'yaml' ? 'yaml' : 'json'
+        editor.setModel(monaco.editor.createModel(initialStringValue || '', language))
       }
-
-      monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-        enableSchemaRequest: true,
-        schemas: [
-          ...(monaco.languages.json.jsonDefaults.diagnosticsOptions.schemas || []),
-          jsonSchema,
-        ],
-        validate: true,
-      })
-
-      const uri = jsonSchema.uri
-      const newUri = uri.includes('?')
-        ? `${uri}&${crypto.randomUUID ? crypto.randomUUID() : uuidv4()}`
-        : `${uri}?${crypto.randomUUID ? crypto.randomUUID() : uuidv4()}`
-
-      editor.setModel(
-        monaco.editor.createModel(JSON.stringify(value, null, 2), 'json', monaco.Uri.parse(newUri)),
-      )
     },
-    [jsonSchema, value],
+    [jsonSchema, value, format, initialStringValue],
   )
 
   const handleChange = useCallback(
@@ -100,28 +114,43 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
       inputChangeFromRef.current = 'user'
 
       try {
-        setValue(val ? JSON.parse(val) : null)
+        let parsedValue
+        if (format === 'yaml') {
+          parsedValue = val ? yaml.parse(val) : null
+        } else if (format === 'json5') {
+          parsedValue = val ? JSON5.parse(val) : null
+        } else {
+          parsedValue = val ? JSON.parse(val) : null
+        }
+        setValue(parsedValue)
         setJsonError(undefined)
       } catch (e) {
         setValue(val ? val : null)
         setJsonError(e)
       }
     },
-    [readOnly, disabled, setValue],
+    [readOnly, disabled, setValue, format],
   )
 
   useEffect(() => {
     if (inputChangeFromRef.current === 'system') {
-      setInitialStringValue(
-        (value || initialValue) !== undefined
-          ? JSON.stringify(value ?? initialValue, null, 2)
-          : undefined,
-      )
+      if ((value || initialValue) !== undefined) {
+        const data = value ?? initialValue
+        if (format === 'yaml') {
+          setInitialStringValue(yaml.stringify(data))
+        } else if (format === 'json5') {
+          setInitialStringValue(JSON5.stringify(data, null, 2))
+        } else {
+          setInitialStringValue(JSON.stringify(data, null, 2))
+        }
+      } else {
+        setInitialStringValue(undefined)
+      }
       setEditorKey(new Date().toString())
     }
 
     inputChangeFromRef.current = 'system'
-  }, [initialValue, value])
+  }, [initialValue, value, format])
 
   const styles = useMemo(() => mergeFieldStyles(field), [field])
 
@@ -151,7 +180,7 @@ const JSONFieldComponent: JSONFieldClientComponent = (props) => {
         />
         {BeforeInput}
         <CodeEditor
-          defaultLanguage="json"
+          defaultLanguage={format === 'yaml' ? 'yaml' : 'json'}
           key={editorKey}
           maxHeight={maxHeight}
           onChange={handleChange}
