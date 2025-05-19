@@ -13,8 +13,8 @@ import { jobAfterRead, jobsCollectionSlug } from './config/index.js'
 import { runJobs } from './operations/runJobs/index.js'
 import { updateJob, updateJobs } from './utilities/updateJob.js'
 
-export const getJobsLocalAPI = (payload: Payload) => ({
-  queue: async <
+export const getJobsLocalAPI = (payload: Payload) => {
+  const queue = async <
     // eslint-disable-next-line @typescript-eslint/no-duplicate-type-constituents
     TTaskOrWorkflowSlug extends keyof TypedJobs['tasks'] | keyof TypedJobs['workflows'],
   >(
@@ -95,9 +95,9 @@ export const getJobsLocalAPI = (payload: Payload) => ({
         }),
       }) as unknown as ReturnType
     }
-  },
+  }
 
-  run: async (args?: {
+  const run = async (args?: {
     limit?: number
     overrideAccess?: boolean
     /**
@@ -126,12 +126,13 @@ export const getJobsLocalAPI = (payload: Payload) => ({
       sequential: args?.sequential,
       where: args?.where,
     })
-  },
+  }
 
-  runByID: async (args: {
+  const runByID = async (args: {
     id: number | string
     overrideAccess?: boolean
     req?: PayloadRequest
+    returnJob?: boolean
   }): Promise<ReturnType<typeof runJobs>> => {
     const newReq: PayloadRequest = args.req ?? (await createLocalReq({}, payload))
 
@@ -139,10 +140,11 @@ export const getJobsLocalAPI = (payload: Payload) => ({
       id: args.id,
       overrideAccess: args.overrideAccess !== false,
       req: newReq,
+      returnJobs: args.returnJob,
     })
-  },
+  }
 
-  cancel: async (args: {
+  const cancel = async (args: {
     overrideAccess?: boolean
     queue?: string
     req?: PayloadRequest
@@ -191,9 +193,9 @@ export const getJobsLocalAPI = (payload: Payload) => ({
       returning: false,
       where: { and },
     })
-  },
+  }
 
-  cancelByID: async (args: {
+  const cancelByID = async (args: {
     id: number | string
     overrideAccess?: boolean
     req?: PayloadRequest
@@ -219,5 +221,46 @@ export const getJobsLocalAPI = (payload: Payload) => ({
       req: newReq,
       returning: false,
     })
-  },
-})
+  }
+
+  const queueAndRun = async <
+    // eslint-disable-next-line @typescript-eslint/no-duplicate-type-constituents
+    TTaskOrWorkflowSlug extends keyof TypedJobs['tasks'] | keyof TypedJobs['workflows'],
+  >(
+    args:
+      | {
+          input: TypedJobs['tasks'][TTaskOrWorkflowSlug]['input']
+          queue?: string
+          req?: PayloadRequest
+          task: TTaskOrWorkflowSlug extends keyof TypedJobs['tasks'] ? TTaskOrWorkflowSlug : never
+          waitUntil?: Date
+          workflow?: never
+        }
+      | {
+          input: TypedJobs['workflows'][TTaskOrWorkflowSlug]['input']
+          queue?: string
+          req?: PayloadRequest
+          task?: never
+          waitUntil?: Date
+          workflow: TTaskOrWorkflowSlug extends keyof TypedJobs['workflows']
+            ? TTaskOrWorkflowSlug
+            : never
+        },
+  ): Promise<
+    TTaskOrWorkflowSlug extends keyof TypedJobs['workflows']
+      ? RunningJob<TTaskOrWorkflowSlug>
+      : RunningJobFromTask<TTaskOrWorkflowSlug>
+  > => {
+    const queued = await queue<TTaskOrWorkflowSlug>(args as Parameters<typeof queue>[0])
+
+    const result = await runByID({ id: queued.id, req: args.req, returnJob: true })
+
+    type ReturnType = TTaskOrWorkflowSlug extends keyof TypedJobs['workflows']
+      ? RunningJob<TTaskOrWorkflowSlug>
+      : RunningJobFromTask<TTaskOrWorkflowSlug>
+
+    return result.jobs?.[0] as ReturnType
+  }
+
+  return { cancel, cancelByID, queue, queueAndRun, run, runByID }
+}
