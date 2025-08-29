@@ -47,7 +47,7 @@
     "@payloadcms/db-postgres": "3.29.0",
     "@payloadcms/db-sqlite": "3.29.0",
     "@payloadcms/eslint-config": "3.9.0",
-    "@payloadcms/next": "3.29.0",
+    "@payloadcms/next": "3.44.0",
     "@payloadcms/richtext-lexical": "3.29.0",
     "@payloadcms/ui": "3.29.0",
     "@swc-node/register": "1.10.9",
