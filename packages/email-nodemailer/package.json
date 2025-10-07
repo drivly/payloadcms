@@ -41,7 +41,7 @@
     "prepublishOnly": "pnpm clean && pnpm turbo build"
   },
   "dependencies": {
-    "nodemailer": "6.9.16"
+    "nodemailer": "7.0.7"
   },
   "devDependencies": {
     "@types/nodemailer": "6.4.17",
